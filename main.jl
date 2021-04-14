@@ -1,21 +1,21 @@
-using LightGraphs
 using LinearAlgebra  # For identity matrix.
 using SparseArrays
 
 using .ConjugateGradient
 using .InputGenerator
 
-n_nodes = 3
-n_edges = 4
+#read DIMACS input
+n_nodes, n_edges, b, E, D = readDIMACS("netgen-1000-1-1-a-a-ns.dmx")
 
-G = create_graph(n_nodes, n_edges)
-E = incidence_matrix(G)
-D = SparseMatrixCSC(1.0I, n_edges, n_edges)
+# compute Laplacian
+L = E * inv(Array(D)) * E'
 
-L = E * inv(Matrix(D)) * E'
-
-b = vector_from_image(L)
+if rank(L) != (n_nodes -1)
+    print("Rank must be n - 1")
+end
 
 x = conjugate_gradient(L, b)
 
 L * x ≈ b
+
+norm((L * x - b)) / norm(b)
