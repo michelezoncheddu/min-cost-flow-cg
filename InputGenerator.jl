@@ -23,11 +23,13 @@ module InputGenerator
         edges_counter = 1 # edge labelling
         b = Float64[] # target vector
         
-        #incidence matrix E
+        # incidence matrix E
         e_x = Int64[] 
         e_y = Int64[]
         e_v = Float64[]
         
+        edges_list = Pair{Int64, Int64}[]   # list of edges
+
         diag = Float64[] # weight D
         
         open(file_name, "r") do f
@@ -46,6 +48,7 @@ module InputGenerator
                     # for building E
                     src = parse(Int64,tokens[2])
                     dst = parse(Int64,tokens[3])
+                    push!(edges_list, src => dst)
                     append!(e_x, src)
                     append!(e_y, edges_counter)
                     append!(e_v, 1)
@@ -60,9 +63,8 @@ module InputGenerator
             end
         end
        
-        D = sparse(Array{Int64}(1:n_edges) ,Array{Int64}(1:n_edges), diag)
         E = sparse(e_x, e_y, e_v)
-        return n_nodes, n_edges, b, E, D
+        return n_nodes, n_edges, edges_list, b, E, diag
     end
     
 
