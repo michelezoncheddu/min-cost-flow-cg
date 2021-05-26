@@ -13,15 +13,22 @@ function first_part_product(edges_list, E, D, b)
 end
 
 
-function conjugate_gradient(edges_list, E, D, b::Vector)
+function conjugate_gradient(edges_list, E, D, b, tol)
     n = size(b, 1)
     x = zeros(n)
     d = b
     r_old = b
     D_inv = ones(size(D, 1)) ./ D
 
-    for i in 1:n
+    errors = []
+
+    for i in 1:size(E, 2)  # TODO: check dimension
         rr_old = r_old'r_old
+
+        if sqrt(rr_old) <= tol  # TODO: check
+            return x, errors
+        end
+        
         Ld = E * first_part_product(edges_list, E, D_inv, d)
 
         alpha = rr_old / (d'Ld)
@@ -31,7 +38,8 @@ function conjugate_gradient(edges_list, E, D, b::Vector)
         d = r + beta * d
 
         r_old = r
+        append!(errors, norm(r))
     end
 
-    return x
+    return x, errors
 end
