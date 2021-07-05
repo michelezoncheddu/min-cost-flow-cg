@@ -57,6 +57,11 @@ function readDIMACS(file_name)
                 append!(e_v, -1)
                 # for building D
                 weight = parse(Float64,tokens[6])
+                
+                if weight == 0
+                    weight = 1
+                end
+                
                 append!(diag, weight)
                 edges_counter = edges_counter + 1
             end

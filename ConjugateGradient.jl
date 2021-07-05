@@ -37,6 +37,7 @@ function conjugate_gradient(edges_list, E, D, b, tol, max_iter)
         rr_old = r_old'r_old
 
         if sqrt(rr_old) <= tol
+            print("fast")
             return x, errors
         end
         
