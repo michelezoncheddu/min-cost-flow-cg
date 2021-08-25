@@ -8,6 +8,7 @@
 
 # Datasets folder
 datasets/
+datasets_old/
 plots/
 
-plot.png
+*.txt

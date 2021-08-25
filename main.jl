@@ -1,3 +1,4 @@
+using Plots
 using LinearAlgebra  # For identity matrix.
 using SparseArrays
 using Distributions
@@ -8,30 +9,81 @@ include("InputGenerator.jl")
 include("ConjugateGradient.jl")
 
 
-# Read DIMACS input.
-n_nodes, n_edges, edges_list, b, E, D = readDIMACS("datasets/road_flow_02_DE_a.min")
-
-if rank(E) != (n_nodes-1)
-    print("ERROR: The graph must be connected.")
+# It performs the product EDE^Tv.
+function custom_product(edges_list, E, D, b)
+    x = zeros(size(E, 2))
+    for (i, (src, dst)) in enumerate(edges_list)
+        x[i] = D[i] * (b[src] - b[dst])
+    end
+    return E * x
 end
 
-#=rad = 50
-distr = Uniform(-rad, rad)
-D = exp.(rand(distr, n_edges))=#
 
-# Compute Laplacian matrix.
-L = Array(E * sparse(Array{Int64}(1:n_edges), Array{Int64}(1:n_edges), inv.(D)) * E')
+function test(dir, filename)
+    # Read DIMACS input.
+    n_nodes, n_edges, edges_list, b, E, D = readDIMACS(dir * filename * ".dmx")
 
-eigs = eigvals(L)
-max_iter = n_nodes #sqrt(eigs[end] / eigs[2])
+    if rank(E) != (n_nodes-1)
+        println("ERROR: The graph must be connected.")
+    end
 
-x, errors = conjugate_gradient(edges_list, E, D, b, 1e-5, max_iter)
+    rad = 15
+    distr_exp = Uniform(-rad, rad)
+    distr_uni = Uniform(0, exp(rad))
+    #D = exp.(rand(distr_exp, n_edges))
+    D = rand(distr_uni, n_edges)
 
-L * x ≈ b
+    # Compute Laplacian matrix.
+    L = E * sparse(1:n_edges, 1:n_edges, inv.(D)) * E'
 
-print(norm((L * x - b)) / norm(b))
+    #eigs = eigvals(Array(L))
+    #println(sqrt(eigs[end] / eigs[2]))  # Condition number
+    max_iter = 10000 #sqrt(eigs[end] / eigs[2])
 
-p = plot(1:length(eigs), log10.(abs.(eigs[1:end])), legend=false, xlabel="i-th eigenvalue", ylabel="log(λᵢ)")
-p = plot(1:length(errors), log10.(errors), legend=false)
+    time = @elapsed begin
+        x, residuals = conjugate_gradient(custom_product, edges_list, E, D, b, 1e-8, max_iter)
+    end
+    println(time)  # Seconds
+    println(time / length(residuals) * 1000)  # Milliseconds
 
-#savefig(p, "plot.png")
+    #println(norm((L * x - b)) / norm(b))
+
+    #p1 = plot(2:length(eigs), log10.(abs.(eigs[2:end])), legend=false, xlabel="i-th eigenvalue", ylabel="log(λᵢ)")
+    p = plot(1:length(residuals), log10.(residuals), legend=false)
+
+    savefig(p, dir * "plots/" * filename * ".png")
+
+    return length(residuals)
+end
+
+
+tool = "netgen/"
+dir = "datasets/" * tool
+files = readdir(dir)
+
+
+i = 0
+f = open("results.txt", "w")
+for file in files
+    if !endswith(file, ".dmx")
+        continue
+    end
+    
+    #break
+
+    println("Testing " * file)
+    filename = chop(file, tail=4)  # Remove .dmx extension
+    steps = test(dir, filename)
+
+    write(f, string(steps))
+
+    i += 1
+    if i % 4 == 0
+        write(f, "\n")
+    else
+        write(f, " ")
+    end
+end
+close(f)
+
+#test(dir, "netgen200-70")
