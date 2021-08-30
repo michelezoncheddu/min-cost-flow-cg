@@ -58,5 +58,5 @@ function readDIMACS(file_name)
     end
     
     E = sparse(e_x, e_y, e_v)
-    return n_nodes, n_edges, edges_list, b, E, diag
+    return edges_list, b, E, diag
 end
