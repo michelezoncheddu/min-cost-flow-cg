@@ -1,6 +1,35 @@
 using Printf
 using SparseArrays
 
+
+"""
+Performs the product EDE^T * v, exploiting the structure
+of the incidence matrix.
+
+# Input parameters
+    - edges_list: list of pairs (src => dst);
+    
+    - E: incidence matrix;
+
+    - D: weight/cost list;
+
+    - v: vector.
+
+# Returns
+    - The vector y = EDE^T * v.
+"""
+function custom_product(edges_list::Array{<:Pair{<:Integer, <:Integer}, 1},
+                        E::SparseMatrixCSC{<:Real, <:Integer},
+                        D::Array{<:Real, 1},
+                        v::Array{<:Real, 1})
+    x = zeros(size(E, 2))
+    for (i, (src, dst)) in enumerate(edges_list)
+        x[i] = D[i] * (v[src] - v[dst])
+    end
+    return E * x
+end
+
+
 """
 Implements a conjugate gradient algorithm for solving
 the linear system EDE^Tx = b.
@@ -58,6 +87,7 @@ function conjugate_gradient(product_function,
     x = zeros(n)   # Approximated solution
     r_old = b      # Residual of the previous iteration
     d = b          # Direction of the iteration
+    rr_old = r_old'r_old
 
     D_inv = ones(size(D, 1)) ./ D  # D^(-1)
     tol *= norm(b)

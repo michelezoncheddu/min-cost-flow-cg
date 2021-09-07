@@ -1,40 +1,12 @@
 using Distributions
 using IterativeSolvers
-using LinearAlgebra  # For identity matrix.
-using Plots
+using LinearAlgebra
+#using Plots
 using SparseArrays
 
 
-include("InputGenerator.jl")
+include("InputParser.jl")
 include("ConjugateGradient.jl")
-
-
-"""
-Performs the product EDE^T * v, exploiting the structure
-of the incidence matrix.
-
-# Input parameters
-    - edges_list: list of pairs (src => dst);
-    
-    - E: incidence matrix;
-
-    - D: weight/cost list;
-
-    - v: vector.
-
-# Returns
-    - The vector y = EDE^T * v.
-"""
-function custom_product(edges_list::Array{<:Pair{<:Integer, <:Integer}, 1},
-                        E::SparseMatrixCSC{<:Real, <:Integer},
-                        D::Array{<:Real, 1},
-                        v::Array{<:Real, 1})
-    x = zeros(size(E, 2))
-    for (i, (src, dst)) in enumerate(edges_list)
-        x[i] = D[i] * (v[src] - v[dst])
-    end
-    return E * x
-end
 
 
 """
@@ -42,7 +14,7 @@ Tests different linear system solvers for a quadratic MCF problem
 read in a DIMACS file.
 
 # Input parameters
-    - dir: directory in which search the input file;
+    - dir: directory in which to search the input file;
     
     - filename: name of the input file. The file must be DIMACS compliant;
     
@@ -54,11 +26,13 @@ read in a DIMACS file.
     
     - [max_iter = 10000]: maximum number of steps for iterative algorithms;
     
-    - [tol = 1e-8]: accuracy for the stopping criterion for iterative algorithms.
+    - [tol = 1e-8]: accuracy for the stopping criterion for iterative algorithms;
+
+    - [direct = false]: runs also the direct methods for solving the linear system.
 """
-function test(dir, filename; distr_type = 0, range = 5, max_iter = 10000, tol = 1e-8)
-    # Read DIMACS input.
-    edges_list, b, E, D = readDIMACS("$dir/$filename.dmx")
+function test(filename; distr_type = 0, range = 5, max_iter = 10000, tol = 1e-8, direct = false)
+    filename = chop(filename, tail = 4)  # Remove .dmx extension.
+    edges_list, b, E, D = readDIMACS("$filename.dmx")  # Read DIMACS input.
     n_edges = length(edges_list)
 
     if distr_type == 1  # Uniform
@@ -83,50 +57,43 @@ function test(dir, filename; distr_type = 0, range = 5, max_iter = 10000, tol = 
     if cmp(status, "error") == 0
         return
     end
-    println("Our CG: $status in $(length(residuals)) steps, took $time seconds, $(time/length(residuals)*1000) ms")
-
-
-    # DEBUG ------------------------------------------------------------------------------------------------
-    return
+    println("\tOur CG: $status in $(length(residuals)) steps, took $time seconds")
 
 
     # Run Julia CG
     time = @elapsed begin
-        x, residuals = cg(L, b, reltol = tol, maxiter = max_iter, log = true)
+        xCG, residuals = cg(L, b, reltol = tol, maxiter = max_iter, log = true)
     end
-    println("Julia CG: took $(residuals.iters) steps, took $time seconds")
+    println("\tJulia CG: took $(residuals.iters) steps, took $time seconds")
 
 
     # Run Julia GMRES
     time = @elapsed begin
-        x, residuals = gmres(L, b, reltol = tol, maxiter = max_iter, log = true)
+        xGMRES, residuals = gmres(L, b, reltol = tol, maxiter = max_iter, log = true)
     end
-    println("Julia GMRES: took $(residuals.iters) steps, took $time seconds")
+    println("\tJulia GMRES: took $(residuals.iters) steps, took $time seconds")
 
+
+    if !direct
+        return
+    end
 
     # Run sparse LU
     time = @elapsed begin
         xLU = lu(L) \ b
     end
-    println("LU: took $time seconds")
+    println("\tLU: took $time seconds")
 
 
     # Run sparse LDL
     time = @elapsed begin
         xLDL = ldlt(L) \ b
     end
-    println("LDL: took $time seconds")
+    println("\tLDL: took $time seconds")
 
-
+    
     # Plots
     #eigs_plot = plot(2:length(eigs), log10.(abs.(eigs[2:end])), legend=false, xlabel="i-th eigenvalue", ylabel="log(λᵢ)")
     #residuals_plot = plot(1:length(residuals), log10.(residuals), legend=false)
-    #savefig(residuals_plot, "$dir/plots/$filename.png")
+    #savefig(residuals_plot, "$filename.png")
 end
-
-
-tool = "netgen"
-dir = "datasets/$tool"
-
-# Example test
-test(dir, "netgen100-10", distr_type = 2, range = 10, max_iter = 100000)
